@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 import matplotlib.pyplot as plt
 import picar_4wd as fc
 from picar_4wd import Ultrasonic, Pin, Servo, PWM
@@ -8,6 +9,9 @@ import opencv
 import astar
 import part1
 from threading import Thread
+from tflite_support.task import core
+from tflite_support.task import processor
+from tflite_support.task import vision
 
 us = Ultrasonic(Pin('D8'), Pin('D9'))
 servo = Servo(PWM("P0"), offset=0)
@@ -83,27 +87,15 @@ def camera():
         # Run object detection estimation using the model.
         detection_result = detector.detect(input_tensor)
 
-        # Draw keypoints and edges on input image
-        image, category_name = visualize(image, detection_result)
-
-        # Calculate the FPS
-        if counter % fps_avg_frame_count == 0:
-          end_time = time.time()
-          fps = fps_avg_frame_count / (end_time - start_time)
-          start_time = time.time()
-
-        # Show the FPS
-        fps_text = 'FPS = {:.1f}'.format(fps)
-        text_location = (left_margin, row_size)
-        cv2.putText(image, fps_text, text_location, cv2.FONT_HERSHEY_PLAIN,
-                    font_size, text_color, font_thickness)
-
-        if category_name == "stop sign":
-            # alert main thread
-            STOP_SIGN = True
-            time.sleep(10)
-            STOP_SIGN = False
-        # Stop the program if the ESC key is pressed.
+        for detection in detection_result.detections:
+            category = detection.categories[0]
+            category_name = category.category_name
+            if category_name == "stop sign":
+                # alert main thread
+                STOP_SIGN = True
+                time.sleep(10)
+                STOP_SIGN = False
+        
         if STOP_THREAD:
           break
         cv2.imshow('object_detector', image)
@@ -189,8 +181,8 @@ def get_plot():
         x = point[0]
         y = point[1]
         A = to_color(x,y,A)
-#     plt.imshow(A, interpolation='none')
-#     plt.show()
+    plt.imshow(A, interpolation='none')
+    plt.show()
     return A
 
 def to_path(x, y, A):
@@ -239,13 +231,15 @@ def direction(path):
 
 
 def go(direc):
-    global STOP_THREAD
+    global STOP_THREAD, STOP_SIGN
     STOP_THREAD = False
     t1 = Thread(target = camera)
     t1.start()
     for i in range(len(direc) - 1):
         if STOP_SIGN:
-            time.sleep(3)
+            fc.stop()
+            time.sleep(5)
+            STOP_SIGN = False
         curr_block = direc[i]
         next_block = direc[i+1]
         if curr_block == 0:
@@ -300,63 +294,63 @@ def west(curr_block, next_block):
     
 def north_go(next_block):
     if next_block == 0:
-        fc.forward(15)
-        time.sleep(.11)
+        fc.forward(10)
+        time.sleep(.03)
     elif next_block == 1:
-        fc.turn_right(100)
-        time.sleep(.5)
+        fc.turn_right(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.05)
     elif next_block == 3:
-        fc.turn_left(100)
-        time.sleep(.5)
+        fc.turn_left(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     
 def east_go(next_block):
     if next_block == 1:
         fc.forward(15)
-        time.sleep(.13)
+        time.sleep(.08)
     elif next_block == 2:
-        fc.turn_right(100)
-        time.sleep(.5)
+        fc.turn_right(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     elif next_block == 0:
-        fc.turn_left(100)
-        time.sleep(.5)
+        fc.turn_left(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     
 def south_go(next_block):
     if next_block == 2:
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     elif next_block == 3:
-        fc.turn_right(100)
-        time.sleep(.5)
+        fc.turn_right(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     elif next_block == 1:
-        fc.turn_left(100)
-        time.sleep(.5)
+        fc.turn_left(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     
 def west_go(next_block):
     if next_block == 3:
         fc.forward(15)
-        time.sleep(.13)
+        time.sleep(.08)
     elif next_block == 0:
-        fc.turn_right(100)
-        time.sleep(.5)
+        fc.turn_right(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
     elif next_block == 2:
-        fc.turn_left(100)
-        time.sleep(.5)
+        fc.turn_left(75)
+        time.sleep(.3)
         fc.forward(15)
-        time.sleep(.12)
+        time.sleep(.08)
         
 def to_destination(dest):
     for i in range(len(dest)):
@@ -366,7 +360,8 @@ def to_destination(dest):
         go(d)
         
 def main():    
-    to_destination([0,0,0])
+    for name in opencv.run('efficientdet_lite0.tflite', 0, 640, 480, 2, False):
+        print(name)
     
 
 

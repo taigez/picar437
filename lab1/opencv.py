@@ -39,6 +39,7 @@ def visualize(
     # Draw label and score
     category = detection.categories[0]
     category_name = category.category_name
+    
     probability = round(category.score, 2)
     result_text = category_name + ' (' + str(probability) + ')'
     text_location = (_MARGIN + bbox.origin_x,
@@ -46,7 +47,7 @@ def visualize(
     cv2.putText(image, result_text, text_location, cv2.FONT_HERSHEY_PLAIN,
                 _FONT_SIZE, _TEXT_COLOR, _FONT_THICKNESS)
 
-  return image, category_name
+  return image
 
 
 def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
@@ -109,7 +110,7 @@ def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
     detection_result = detector.detect(input_tensor)
 
     # Draw keypoints and edges on input image
-    image, category_name = visualize(image, detection_result)
+    image = visualize(image, detection_result)
 
     # Calculate the FPS
     if counter % fps_avg_frame_count == 0:
@@ -123,7 +124,6 @@ def run(model: str, camera_id: int, width: int, height: int, num_threads: int,
     cv2.putText(image, fps_text, text_location, cv2.FONT_HERSHEY_PLAIN,
                 font_size, text_color, font_thickness)
     
-    yield category_name
     # Stop the program if the ESC key is pressed.
     if cv2.waitKey(1) == 27:
       break
