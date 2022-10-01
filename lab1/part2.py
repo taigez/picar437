@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 import matplotlib.pyplot as plt
 import picar_4wd as fc
 from picar_4wd import Ultrasonic, Pin, Servo, PWM
@@ -9,9 +8,6 @@ import opencv
 import astar
 import part1
 from threading import Thread
-from tflite_support.task import core
-from tflite_support.task import processor
-from tflite_support.task import vision
 
 us = Ultrasonic(Pin('D8'), Pin('D9'))
 servo = Servo(PWM("P0"), offset=0)
@@ -27,82 +23,6 @@ CAR_COLOR = 100
 OBJECT_COLOR = 200
 PATH_COLOR = 75
 
-STOP_THREAD = False
-STOP_SIGN = False
-
-
-
-def camera():
-    global STOP_THREAD, STOP_SIGN
-    model = 'efficientdet_lite0.tflite'
-    camera_id = 0
-    width = 640
-    height = 480
-    num_threads = 2
-    enable_edgetpu = False
-    
-    # Variables to calculate FPS
-    counter, fps = 0, 0
-    start_time = time.time()
-
-    # Start capturing video input from the camera
-    cap = cv2.VideoCapture(camera_id)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-    # Visualization parameters
-    row_size = 20  # pixels
-    left_margin = 24  # pixels
-    text_color = (0, 0, 255)  # red
-    font_size = 1
-    font_thickness = 1
-    fps_avg_frame_count = 10
-
-    # Initialize the object detection model
-    base_options = core.BaseOptions(
-      file_name=model, use_coral=enable_edgetpu, num_threads=num_threads)
-    detection_options = processor.DetectionOptions(
-      max_results=3, score_threshold=0.3)
-    options = vision.ObjectDetectorOptions(
-      base_options=base_options, detection_options=detection_options)
-    detector = vision.ObjectDetector.create_from_options(options)
-
-    # Continuously capture images from the camera and run inference
-    while cap.isOpened():
-        success, image = cap.read()
-        if not success:
-          sys.exit(
-              'ERROR: Unable to read from webcam. Please verify your webcam settings.'
-          )
-
-        counter += 1
-        image = cv2.flip(image, -1)
-
-        # Convert the image from BGR to RGB as required by the TFLite model.
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # Create a TensorImage object from the RGB image.
-        input_tensor = vision.TensorImage.create_from_array(rgb_image)
-
-        # Run object detection estimation using the model.
-        detection_result = detector.detect(input_tensor)
-
-        for detection in detection_result.detections:
-            category = detection.categories[0]
-            category_name = category.category_name
-            if category_name == "stop sign":
-                # alert main thread
-                STOP_SIGN = True
-                time.sleep(10)
-                STOP_SIGN = False
-        
-        if STOP_THREAD:
-          break
-        cv2.imshow('object_detector', image)
-
-    cap.release()
-    cv2.destroyAllWindows()
-    
 
 # map car coord to matrix coord
 # ex: car starts at 0,0 but map to (50,99)
@@ -181,8 +101,8 @@ def get_plot():
         x = point[0]
         y = point[1]
         A = to_color(x,y,A)
-    plt.imshow(A, interpolation='none')
-    plt.show()
+#     plt.imshow(A, interpolation='none')
+#     plt.show()
     return A
 
 def to_path(x, y, A):
@@ -231,15 +151,7 @@ def direction(path):
 
 
 def go(direc):
-    global STOP_THREAD, STOP_SIGN
-    STOP_THREAD = False
-    t1 = Thread(target = camera)
-    t1.start()
     for i in range(len(direc) - 1):
-        if STOP_SIGN:
-            fc.stop()
-            time.sleep(5)
-            STOP_SIGN = False
         curr_block = direc[i]
         next_block = direc[i+1]
         if curr_block == 0:
@@ -258,7 +170,6 @@ def go(direc):
         fc.turn_right(100)
         time.sleep(.5)
     fc.stop()
-    STOP_THREAD = True
             
 def north(curr_block, next_block):
     if next_block[1] < curr_block[1]:
@@ -294,63 +205,63 @@ def west(curr_block, next_block):
     
 def north_go(next_block):
     if next_block == 0:
-        fc.forward(10)
-        time.sleep(.03)
+        fc.forward(15)
+        time.sleep(.11)
     elif next_block == 1:
-        fc.turn_right(75)
-        time.sleep(.3)
+        fc.turn_right(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.05)
+        time.sleep(.12)
     elif next_block == 3:
-        fc.turn_left(75)
-        time.sleep(.3)
+        fc.turn_left(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     
 def east_go(next_block):
     if next_block == 1:
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.13)
     elif next_block == 2:
-        fc.turn_right(75)
-        time.sleep(.3)
+        fc.turn_right(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     elif next_block == 0:
-        fc.turn_left(75)
-        time.sleep(.3)
+        fc.turn_left(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     
 def south_go(next_block):
     if next_block == 2:
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     elif next_block == 3:
-        fc.turn_right(75)
-        time.sleep(.3)
+        fc.turn_right(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     elif next_block == 1:
-        fc.turn_left(75)
-        time.sleep(.3)
+        fc.turn_left(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     
 def west_go(next_block):
     if next_block == 3:
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.13)
     elif next_block == 0:
-        fc.turn_right(75)
-        time.sleep(.3)
+        fc.turn_right(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
     elif next_block == 2:
-        fc.turn_left(75)
-        time.sleep(.3)
+        fc.turn_left(100)
+        time.sleep(.5)
         fc.forward(15)
-        time.sleep(.08)
+        time.sleep(.12)
         
 def to_destination(dest):
     for i in range(len(dest)):
@@ -360,8 +271,7 @@ def to_destination(dest):
         go(d)
         
 def main():    
-    for name in opencv.run('efficientdet_lite0.tflite', 0, 640, 480, 2, False):
-        print(name)
+    to_destination([0,0,0])
     
 
 
@@ -374,5 +284,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         fc.stop()
         exit(0)
-    
-
